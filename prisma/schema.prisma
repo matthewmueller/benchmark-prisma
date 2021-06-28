@@ -1,13 +1,13 @@
 generator client {
-  provider = "prisma-client-js"
+  provider        = "prisma-client-js"
   previewFeatures = ["nApi", "filterJson"]
-  output = "./client"
+  output          = "./client"
 }
 
 generator client2 {
-  provider = "prisma-client-js"
+  provider        = "prisma-client-js"
   previewFeatures = ["filterJson"]
-  output = "./client-nonapi"
+  output          = "./client-nonapi"
 }
 
 datasource db {
