@@ -1,4 +1,5 @@
 node_modules
 .idea
+.direnv
 prisma/client
 prisma/client-nonapi
