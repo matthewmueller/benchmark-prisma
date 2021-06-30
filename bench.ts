@@ -16,71 +16,75 @@ export function sampleData(oldArr, width) {
   })
 }
 
-export async function runTest(useNapi) {
+export async function runTest(useNapi, concurrency, f) {
   const {prisma} = await setup(useNapi)
   await prisma.$connect();
 
   const histogram = new measured.Histogram()
-
   const data = []
 
   // warmup
   await pTimes(
     100,
     async () => {
-      await test(prisma)
+      await f(prisma)
     },
-    { concurrency: 48 }
+    { concurrency: 8 }
   )
 
   //test
   await pTimes(
     80,
     async () => {
-      const start = now()
-      await test(prisma)
-      const duration = now() - start
+      let length = data.push(undefined)
+
+      const start = performance.now()
+      await f(prisma)
+      const duration = performance.now() - start
+
       histogram.update(duration)
-      data.push(duration)
+      data[length-1] = duration
     },
-    {concurrency: 8},
+    {concurrency: concurrency},
   )
   const results = histogram.toJSON()
 
   await prisma.$disconnect()
-  return {results, data}
+
+  const title = useNapi ? "Node-API" : "Binary";
+  return {results, data, title}
 }
 
-export function setup(useNapi) {
-  const PrismaClient = useNapi ? PrismaClientNapi : PrismaClientNoNapi
-  const prisma = new PrismaClient()
-  return {prisma}
-}
-
-export async function test(prisma) {
-  var results = await prisma.track.findMany()
-  return results
+export function setup(useNapi: boolean) {
+  const PrismaClient = useNapi ? PrismaClientNapi : PrismaClientNoNapi;
+  const prisma = new PrismaClient();
+  return {prisma};
 }
 
 export function printResultsCsv(results) {
-  var fields = Object.keys(results[0].results)
-  var replacer = function(key, value) { return value === null ? '' : value }
-  var csv = results.map(function(row){
-    return fields.map(function(fieldName){
-      return JSON.stringify(row.results[fieldName], replacer)
-    }).join(',')
-  })
-  csv.unshift(fields.join(',')) // add header column
-  csv = csv.join('\r\n');
-  console.log(csv)
+  var fields = Object.keys(results[0].results);
+  var replacer = function(key, value) { return value === null ? '' : value };
 
-  console.log("---- Graph ----")
+  const csv = results.map(function(row) {
+    var data = fields.map(function(fieldName){
+      return JSON.stringify(row.results[fieldName], replacer)
+    });
+
+    return [row.title].concat(data).join(',');
+  });
+
+  csv.unshift([''].concat(fields.join(','))); // add header column
+  csv = csv.join('\r\n');
+  console.log(csv);
+
+  console.log();
 
   var csv = results.map(function(row) {
-    return row.data.join(',')
-  })
+    return [row.title].concat(row.data).join(',');
+  });
 
-  console.log(csv.join('\r\n'))
+  console.log(csv.join('\r\n'));
+  console.log();
 }
 
 export function printResults({results}) {
